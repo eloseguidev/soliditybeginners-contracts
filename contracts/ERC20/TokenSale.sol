@@ -13,13 +13,18 @@ contract TokenSale {
         token = ERC20(_token);
     }
 
-    function purchase() public payable {
-        require(msg.value >= tokenPrice, "ERROR: Not enough money");
-        // Se van a comprar tantos tokens como lo que tenemos en msg.value nos permita
-        uint256 tokensToTransfer = msg.value / tokenPrice;
+    /// @notice Comprar amount tokens con el saldo de msg.value y recibir el dinero sobrante
+    /// @param amount Número de tokens a comprar
+    function purchase(uint256 amount) public payable {
+        require(msg.value >= tokenPrice * amount, "ERROR: Not enough money");
 
+        // En esta variable se almacenan "las vueltas" el dinero sobrante de msg.value después de hacer la compra
+        uint256 remainder = msg.value - (tokenPrice * amount);
         // msg.sender en este caso no es la de quien despliega el smart contract sino la del contrato TokenSale
         // Es necesario enviarle tokens a la dirección en la que se despliega este contrato para poder hacer la operación.
-        token.transfer(msg.sender, tokensToTransfer * 10 ** token.decimals());
+        token.transfer(msg.sender, amount * 10 ** token.decimals());
+
+        // msg.sender es una dirección pero no de tipo payable, así que hay que convertirla antes de poder transferir
+        payable(msg.sender).transfer(remainder);
     }
 }
