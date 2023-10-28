@@ -17,7 +17,6 @@ contract NFT is ERC721, Ownable {
         uint256 id;
         uint8 level;
         uint8 rarity;
-        address owner;
     }
 
     Nft[] private _nfts;
@@ -28,13 +27,19 @@ contract NFT is ERC721, Ownable {
         _counter = 0;
     }
 
-    // ------------------------------ Funciones ------------------------
-    // Dos funciones para actualizar el precio del NFT y el de subir el token de nivel
-    // SOlo las podrá hacer el dueño del contrato
+    // --------------------------------------------------------------------------
+    // ------------------------------ Funciones públicas ------------------------
+    // --------------------------------------------------------------------------
 
+    // @notice Crear un NFT aleatorio a partir únicamente del nombre
     function createRandomNft(string memory name) public payable {
         require(msg.value >= _price, "Insufficient money");
         _createNFT(name);
+
+        /* Calculamos lo que sobra de msg.value tras la transacción para devolverla a msg.sender
+         * si no se escriben las dos líneas siguientes, aunque el precio de la transacción sea menor, 
+         * se consumirá todo el msg.value disponible y pasará al balance del contrato
+         */
         uint256 remainder = msg.value - _price;
         payable(msg.sender).transfer(remainder);
     }
@@ -42,31 +47,38 @@ contract NFT is ERC721, Ownable {
     /// @notice Aumentar el nivel del token
     function levelUp(uint256 tokenId) public payable {
         require(msg.value >= _priceLevelUp, "Insufficient money");
+        
+        // Solo puede aumentar el nivel del token el dueño del mismo
         require(ownerOf(tokenId) == msg.sender, "You don't have permissions");
         _nfts[tokenId].level++;
         
-        uint256 remainder = msg.value - _price;
+        // Devolver el dinero sobrante
+        uint256 remainder = msg.value - _priceLevelUp;
         payable(msg.sender).transfer(remainder);
     }
 
+    // @notice Retirar todo el balance del contrato a la cuenta del propietario
     function withdraw() external payable onlyOwner {
         balanceOf(msg.sender);
         payable(owner()).transfer(address(this).balance);
     }
 
-
+    /// @notice Actualizar el precio del token
     function updatePrice (uint256 price) external onlyOwner {
         _price = price;
     }
 
+    // @notice Actualizar el precio por el que se puede subir de nivel el token
     function updatePriceLevelUp (uint256 priceLevelUp) external onlyOwner {
         _priceLevelUp = priceLevelUp;
     }
 
+    // @notice Obtener todos los NFTs
     function getAllNfts() public view returns (Nft[] memory) {
         return _nfts;
     }
 
+    // @notice Obtener los NFTs que posee una dirección
     function getNftsByOwner(address owner) public view returns (Nft[] memory){
         Nft[] memory newArray;
         uint count;
@@ -81,12 +93,12 @@ contract NFT is ERC721, Ownable {
         return newArray;
     }
 
+    // --------------------------------------------------------------------------
     // ------------------------------ Funciones internas ------------------------
-    // Veremos como generar un número aleatorio con Solidity para el nivel de rareza de nuestro token
+    // --------------------------------------------------------------------------
 
     /*
      * @notice Genera un número aleatorio de 256 bits y la utilizaremos para calcular la rareza de nuestro NFT
-     *
      */
     function _randomNumber (uint256 number) internal view returns (uint256) {
         // block.timestamp devuelve la fecha y hora exactas a la que se genera la transacción
@@ -95,15 +107,18 @@ contract NFT is ERC721, Ownable {
         return randomNumber % number;
     }
 
+    /// @notice Creación del NFT
     function _createNFT(string memory name) internal {
         //TODO Duda: cómo castea un número de 256 bits a uno de 8 si es el máximo por ejemplo
         uint8 rarity = uint8(_randomNumber(1000));
 
-        Nft memory newToken = Nft(name, _counter, 1, rarity, msg.sender);
+        Nft memory newToken = Nft(name, _counter, 1, rarity);
         _safeMint(msg.sender, _counter);
 
         _nfts.push(newToken);
 
         emit newNFT(msg.sender, _counter, name);
+
+        _counter++;
     }
 }
